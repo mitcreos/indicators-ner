@@ -1,0 +1,95 @@
+---
+title: "soc_imputations"
+author: "Ashley Yang"
+date: "2024-07-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries and loading}
+library(opengender)
+library(data.table)
+library(dplyr)
+
+data <-read.csv("/Users/ashleyyang/Desktop/RA/ror_data/v.1.49.csv")
+soc <- readRDS("/Users/ashleyyang/Desktop/RA/sociology_dissertations_extract.RDS")
+
+data <- data[order(data$name), ]
+soc <- soc[order(soc$organization), ]
+
+View(data)
+View(soc)
+```
+
+```{r perfect match ror -- filter method}
+##from the soc df, look into the data df, look for org name from soc in "name" column 
+soc$ror_id <- NA
+
+for (i in 1:nrow(soc)) {
+  soc_org <- soc$organization[i]
+  df_filtered <- filter(data, name == soc_org)
+  df_filtered2 <- filter(data, aliases == soc_org)
+  
+  if (nrow(df_filtered) > 0) {
+    soc$ror_id[i] <- df_filtered$id[1]
+  ##if not in, look at alias column
+
+  } else if (nrow(df_filtered2) > 0) {
+    soc$ror_id[i] <- df_filtered2$id[1]
+  } else{
+    soc$ror_id[i] <- NA
+  }
+}
+
+View(soc)
+##if not in either bucket, go onto fuzzy matching 
+```
+
+```{r joining method}
+##left join? need to understand... 
+
+##practice r syntax...
+```
+
+```{r fuzzy matching}
+library(stringr)
+#initalize probability col as na's
+#find all nas in data
+soc_na <- filter(soc, is.na(ror_id))
+
+soc_na$ror_id <- NA
+
+normalize_org_name <- function(name) {
+  name <- str_remove_all(name, "\\(.*?\\)")  #anything in parentheses
+  name <- str_remove(name, "^The\\s")  #"The" at the beginning
+  name <- str_remove_all(name, ",")  #commas that dint need to be there
+  name <- str_replace_all(name, "\\s*-\\s*", "-")  #extra spaces around hyphens
+  name <- str_trim(name)  #exttra spaces
+  return(name)
+}
+
+soc_na$normalized_org <- normalize_org_name(soc_na$organization)
+
+for (i in 1:nrow(soc_na)) {
+  soc_org <- soc_na$normalized_org[i]
+  df_filtered <- filter(data, name == soc_org)
+  df_filtered2 <- filter(data, aliases == soc_org)
+  
+  if (nrow(df_filtered) > 0) {
+    soc_na$ror_id[i] <- df_filtered$id[1]
+  } else if (nrow(df_filtered2) > 0) {
+    soc$ror_id[i] <- df_filtered2$id[1]
+  }
+}
+
+View(soc_na)
+```
+
+```{r second round na normalization?}
+df_na_2 <- filter(soc_na, is.na(soc_na$ror_id))
+
+View(df_na_2)
+```
